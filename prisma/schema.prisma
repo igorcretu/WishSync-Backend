@@ -1,0 +1,157 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  nickname     String
+  color        String   @default("#F2C2C9")
+  initial      String
+  birthday         String?
+  avatarPath       String?  @map("avatar_path")
+  notifBirthdays   Boolean  @default(true)  @map("notif_birthdays")
+  notifPriceDrops  Boolean  @default(true)  @map("notif_price_drops")
+  notifNewWishes   Boolean  @default(false) @map("notif_new_wishes")
+  notifReactions   Boolean  @default(true)  @map("notif_reactions")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  wishes        Wish[]
+  reservations  Reservation[]
+  reactions     Reaction[]
+  circleMembers CircleMember[]
+  ownedCircles  Circle[]
+  sentInvites   Invite[]
+  purchases     PurchasedItem[]
+
+  @@map("users")
+}
+
+model Wish {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  imagePath     String?  @map("image_path")
+  imageTint     String   @default("#F6B89A") @map("image_tint")
+  imageLabel    String   @default("product") @map("image_label")
+  price         Float
+  originalPrice Float?   @map("original_price")
+  currency      String   @default("$")
+  store         String
+  storeUrl      String?  @map("store_url")
+  category      String
+  priority      Priority
+  occasion      String
+  notes         String   @default("")
+  discount      Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  reservation Reservation?
+  reactions   Reaction[]
+  purchase    PurchasedItem?
+
+  @@map("wishes")
+}
+
+enum Priority {
+  must
+  love
+  nice
+}
+
+model Reservation {
+  wishId     String   @id @map("wish_id")
+  wish       Wish     @relation(fields: [wishId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  reservedAt DateTime @default(now()) @map("reserved_at")
+
+  @@map("reservations")
+}
+
+model Reaction {
+  wishId String @map("wish_id")
+  wish   Wish   @relation(fields: [wishId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+  type   String // heart | eyes | gift
+
+  @@id([wishId, userId, type])
+  @@map("reactions")
+}
+
+model Circle {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // couple | friends
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  members   CircleMember[]
+  invites   Invite[]
+  occasions Occasion[]
+
+  @@map("circles")
+}
+
+model CircleMember {
+  circleId String   @map("circle_id")
+  circle   Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id])
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  @@id([circleId, userId])
+  @@map("circle_members")
+}
+
+model Invite {
+  id          String   @id @default(uuid())
+  circleId    String   @map("circle_id")
+  circle      Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  invitedById String   @map("invited_by_id")
+  invitedBy   User     @relation(fields: [invitedById], references: [id])
+  used        Boolean  @default(false)
+  usedById    String?  @map("used_by_id")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("invites")
+}
+
+model Occasion {
+  id        String   @id @default(uuid())
+  circleId  String   @map("circle_id")
+  circle    Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  title     String
+  date      String
+  personId  String?  @map("person_id")
+  color     String   @default("peach")
+  icon      String   @default("🎁")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("occasions")
+}
+
+model PurchasedItem {
+  id          String   @id @default(uuid())
+  wishId      String   @unique @map("wish_id")
+  wish        Wish     @relation(fields: [wishId], references: [id])
+  purchasedBy String   @map("purchased_by")
+  buyer       User     @relation(fields: [purchasedBy], references: [id])
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  @@map("purchased_items")
+}
