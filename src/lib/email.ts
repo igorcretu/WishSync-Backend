@@ -337,6 +337,28 @@ export async function sendOccasionReminder(to: string[], occasionTitle: string, 
   });
 }
 
+export async function sendPasswordReset(to: string, name: string, resetUrl: string) {
+  await transport.sendMail({
+    from: config.smtp.from,
+    to,
+    subject: 'Reset your WishSync password',
+    html: wrap('#F2C2C9', `
+      <h2 class="title" style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#2B2420;font-weight:normal;line-height:1.2;">
+        Reset your password
+      </h2>
+      <p style="margin:0 0 24px;font-size:15px;color:#5A4F47;line-height:1.65;font-family:Arial,Helvetica,sans-serif;">
+        Hey ${name}, we got a request to reset the password on your WishSync account. Click below to choose a new one.
+      </p>
+
+      ${btn(resetUrl, 'Reset password →')}
+
+      <p style="margin:20px 0 0;font-size:13px;color:#8B7F74;font-family:Arial,Helvetica,sans-serif;line-height:1.5;">
+        This link expires in 1 hour. If you didn't request this, you can safely ignore this email — your password won't change.
+      </p>
+    `),
+  });
+}
+
 export async function sendReactionNotification(to: string, reactorName: string, wishTitle: string, reactionType: string) {
   const emoji = reactionType === 'heart' ? '♥' : reactionType === 'eyes' ? '👀' : '🎁';
   const label = reactionType === 'heart' ? 'loves it' : reactionType === 'eyes' ? 'is eyeing it' : 'wants to gift it';

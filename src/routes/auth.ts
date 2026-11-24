@@ -6,7 +6,7 @@ import fs from 'fs';
 import { z } from 'zod';
 import db from '../db';
 import { signToken, requireAuth, AuthRequest } from '../middleware/auth';
-import { sendWelcome } from '../lib/email';
+import { sendWelcome, sendPasswordReset } from '../lib/email';
 import { config } from '../config';
 
 const router = Router();
@@ -115,6 +115,56 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 
   res.json({ token: signToken(user.id), user: safeUser(user) });
+});
+
+const forgotPasswordSchema = z.object({ email: z.string().email() });
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+  const email = parsed.data.email.toLowerCase();
+
+  const user = await db.user.findUnique({ where: { email } });
+  // always respond the same way, whether or not the account exists
+  if (user) {
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const resetToken = await db.passwordResetToken.create({
+      data: { userId: user.id, expiresAt },
+    });
+    const resetUrl = `${config.frontendUrl}/reset-password/${resetToken.id}`;
+    sendPasswordReset(email, user.name, resetUrl).catch(() => {});
+  }
+
+  res.json({ ok: true });
+});
+
+const resetPasswordSchema = z.object({ password: z.string().min(8) });
+
+// POST /api/auth/reset-password/:token
+router.post('/reset-password/:token', async (req: Request, res: Response) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+
+  const resetToken = await db.passwordResetToken.findUnique({ where: { id: req.params.token } });
+  if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+    res.status(400).json({ error: 'This reset link is invalid or has expired' });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  await db.$transaction([
+    db.user.update({ where: { id: resetToken.userId }, data: { passwordHash } }),
+    db.passwordResetToken.update({ where: { id: resetToken.id }, data: { used: true } }),
+  ]);
+
+  res.json({ ok: true });
 });
 
 // GET /api/auth/me

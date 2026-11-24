@@ -7,7 +7,7 @@ export interface AuthRequest extends Request {
 }
 
 export function signToken(userId: string): string {
-  return jwt.sign({ sub: userId }, config.jwtSecret, { expiresIn: '30d' });
+  return jwt.sign({ sub: userId }, config.jwtSecret, { expiresIn: '365d' });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
